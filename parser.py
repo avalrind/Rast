@@ -6,6 +6,7 @@ class parser :
     def __init__(self , path) : 
 
         self.path = path 
+        self.names = {}
 
         if self.path.endswith('.cpp') : 
         
@@ -18,9 +19,17 @@ class parser :
 
     def remove_spaces(self , lis) : 
 
+        for index in range(len(lis)) :
+            
+            if lis[index] : lis[index] = lis[index].split()[0]
+
+        return lis
+
+    def remove_cols(self , lis) :
+
         for index in range(len(lis)) : 
-                
-            lis[index] = lis[index].split()[0]
+
+            if lis[index] : lis[index] = lis[index].split(';')[0]
 
         return lis
 
@@ -38,7 +47,21 @@ class parser :
 
                 line = body[index]
 
-                if line.startswith('#include') : 
+                line = line.strip()
+
+                if line in self.names : 
+
+                    stack.append(self.names[line])
+                    index += 1
+
+                elif line == '==' : 
+
+                    stack.append(rast.Operator('=='))
+                    index += 1
+                
+
+
+                elif line.startswith('#include') : 
 
                     stack.append(rast.Include(line.split(' ')[1] , line))
                     index += 1
@@ -46,15 +69,18 @@ class parser :
                 elif line.startswith('int') or line.startswith('void') :
     
                     if line.endswith(';') : 
-
-                        stack.append(rast.NamedVariable(line.split()[1] , line.split()[0] , line.split()[2].split(';')))
+                        
+                        if line.split()[1] in self.names : stack.append(self.names[line.split()[1]])
+                        else : 
+                            stack.append(rast.NamedVariable(line.split()[1] , line.split()[0] , line.split()[2].split(';')))
+                            self.names[line.split()[1]] = stack[-1]
                         index += 1              
                     
                     elif line.endswith(')') : 
 
                         function = line.split()[1]
                         function_body = []
-                        
+
                         args = line.split('(')[1].split(')')[0].split(',')
                         args = self.remove_spaces(args)
 
@@ -68,39 +94,88 @@ class parser :
                             line = body[index]
 
                         function_body.append(line)
-                        stack.append(rast.FunctionDef(function , function_body , args))
+                        if function in self.names : stack.append(self.names[function])
+                        else : 
+                            stack.append(rast.FunctionDef(function , function_body , args))
+                            self.names[function] = stack[-1]                        
                         index += 1
 
                     else : index += 1
 
-                elif line.startswith('    ') : 
+                elif line.startswith('if') : 
 
-                    line = line.split('    ')[1]
+                    condition = line.split('(')[1].split(')')[0]
 
-                    if line.startswith('std') : 
-                        
-                        stack.append(rast.SRO(line.split(' ')[1] , line.split('<<')[1].split(';')[0]))
+                    if_body = []
+                    index += 1
+                    line = body[index]
+
+                    while not line.endswith('}') :
+
+
+                        if_body.append(line)
                         index += 1
+                        line = body[index]
 
-                    elif line.startswith('return') : 
+                    if_body.append(line)
+                    stack.append(rast.IfDef(condition , if_body))
+                    index += 1
 
-                        stack.append(rast.Return(line.split(' ')[1]))
-                        index += 1
+                elif line.startswith('std') :
+                    
+                    stack.append(rast.SRO(line.split(' ')[1] , self.remove_cols(line.split('<<')[1:])))
+                    index += 1
 
-                    else : index += 1
-                
+                elif line.startswith('return') : 
+
+                    stack.append(rast.Return(line.split(' ')[1]))
+                    index += 1
+
                 else :
 
-                    stack.append(line)
-                    index += 1
+                    if line : 
+
+                        if (line[0] == '"' and line[-1] == '"') or (line[0] == "'" and line[-1] == "'") :
+
+                            stack.append(rast.BuiltInFunction('str' , line))
+                            index += 1
+
+                        elif line in self.names :
+
+                            stack.append(self.names[line])
+                            index += 1
+
+                        elif '.' in line : 
+
+                            stack.append(rast.BuiltInFunction('float' , line))
+                            index += 1
+                        
+                        elif line.isdigit() :
+
+                            stack.append(rast.BuiltInFunction('int' , line))
+                            index += 1
+
+                        else : 
+
+                            stack.append(line)
+                            index += 1
+
+                    else : index += 1
 
         for index in range(len(stack)) : 
 
             value = stack[index]
 
             if isinstance(value , rast.FunctionDef) : 
+
                 stack[index].body = self.gen_ast_cpp(stack[index].body)
                 stack[index].args = self.gen_ast_cpp(stack[index].args)
+
+            elif isinstance(value , rast.IfDef) :
+                
+                stack[index].body = self.gen_ast_cpp(stack[index].body)
+                stack[index].condition = self.gen_ast_cpp(stack[index].condition.split())
+            
             elif isinstance(value , rast.SRO) : stack[index].body = self.gen_ast_cpp(stack[index].body)
 
         return stack

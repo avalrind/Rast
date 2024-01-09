@@ -44,7 +44,20 @@ class rast :
 
     class SRO : # Scope Resolution Operator
             
-            def __init__(self , name , body) : 
-    
-                self.name = name
-                self.body = body
+        def __init__(self , name , body) : 
+
+            self.name = name
+            self.body = body
+
+    class IfDef : 
+        
+        def __init__(self , condition , body) : 
+
+            self.condition = condition
+            self.body = body
+
+    class Operator: 
+
+        def __init__(self , value) : 
+
+            self.value = value
