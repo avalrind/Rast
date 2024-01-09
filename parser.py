@@ -16,6 +16,14 @@ class parser :
         elif self.path.endswith('.py') : self.load_type = 'py'
         elif self.path.endswith('.java') : self.load_type = 'java'
 
+    def remove_spaces(self , lis) : 
+
+        for index in range(len(lis)) : 
+                
+            lis[index] = lis[index].split()[0]
+
+        return lis
+
     def gen_ast_cpp(self , body) :
 
         stack = [] 
@@ -46,7 +54,9 @@ class parser :
 
                         function = line.split()[1]
                         function_body = []
+                        
                         args = line.split('(')[1].split(')')[0].split(',')
+                        args = self.remove_spaces(args)
 
                         index += 1
                         line = body[index]
@@ -79,7 +89,10 @@ class parser :
 
                     else : index += 1
                 
-                else : index += 1
+                else :
+
+                    stack.append(line)
+                    index += 1
 
         for index in range(len(stack)) : 
 
