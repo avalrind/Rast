@@ -18,9 +18,17 @@ class parser :
 
     def remove_spaces(self , lis) : 
 
+        for index in range(len(lis)) :
+            
+            if lis[index] : lis[index] = lis[index].split()[0]
+
+        return lis
+
+    def remove_cols(self , lis) :
+
         for index in range(len(lis)) : 
-                
-            lis[index] = lis[index].split()[0]
+
+            if lis[index] : lis[index] = lis[index].split(';')[0]
 
         return lis
 
@@ -54,7 +62,7 @@ class parser :
 
                         function = line.split()[1]
                         function_body = []
-                        
+
                         args = line.split('(')[1].split(')')[0].split(',')
                         args = self.remove_spaces(args)
 
@@ -77,9 +85,9 @@ class parser :
 
                     line = line.split('    ')[1]
 
-                    if line.startswith('std') : 
+                    if line.startswith('std') :
                         
-                        stack.append(rast.SRO(line.split(' ')[1] , line.split('<<')[1].split(';')[0]))
+                        stack.append(rast.SRO(line.split(' ')[1] , self.remove_cols(line.split('<<')[1:])))
                         index += 1
 
                     elif line.startswith('return') : 
@@ -99,8 +107,10 @@ class parser :
             value = stack[index]
 
             if isinstance(value , rast.FunctionDef) : 
+                
                 stack[index].body = self.gen_ast_cpp(stack[index].body)
                 stack[index].args = self.gen_ast_cpp(stack[index].args)
+                
             elif isinstance(value , rast.SRO) : stack[index].body = self.gen_ast_cpp(stack[index].body)
 
         return stack
