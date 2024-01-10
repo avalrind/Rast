@@ -1,9 +1,19 @@
 from rast import rast 
-import os
+import networkx as nx
+import matplotlib.pyplot as plt
 
-class parser :
+class raster :
+    '''
+    This class is used to load a C program into a raster object.
+    '''
 
     def __init__(self , path) : 
+        '''
+        This function is used to initialize the raster object.
+
+        Args :
+            1) path : The path to the C program.
+        '''
 
         self.path = path 
         self.names = {}
@@ -19,6 +29,15 @@ class parser :
         elif self.path.endswith('.java') : self.load_type = 'java'
 
     def remove_spaces(self , lis) : 
+        '''
+        This function is used to remove spaces from a list.
+
+        Args :
+            1) lis : The list to remove spaces from.
+
+        Returns :
+            The list without spaces.
+        '''
 
         for index in range(len(lis)) :
             
@@ -27,6 +46,15 @@ class parser :
         return lis
 
     def remove_cols(self , lis) :
+        '''
+        This function is used to remove colons from a list.
+
+        Args :
+            1) lis : The list to remove colons from.
+
+        Returns :
+            The list without colons.
+        '''
 
         for index in range(len(lis)) : 
 
@@ -35,6 +63,16 @@ class parser :
         return lis
 
     def gen_ast_cpp(self , body) :
+        '''
+        This function is used to generate the AST for a C++ program.
+
+        Args :
+
+            1) body : The body of the C++ program.
+
+        Returns :
+            The AST for the C++ program.
+        '''
 
         stack = [] 
 
@@ -50,7 +88,6 @@ class parser :
 
                 line = line.strip()
 
-                # print(line)
                 if line.startswith('//') : continue
 
                 elif line in self.names : 
@@ -60,7 +97,7 @@ class parser :
 
                 elif line in self.ops : 
 
-                    stack.append(rast.Operator('=='))
+                    stack.append(rast.Operator(line))
                     index += 1
                 
                 elif line.startswith('#include') : 
@@ -96,7 +133,7 @@ class parser :
                             line = body[index]
                             line = line.strip()
 
-                        function_body.append(line)
+                        function_body = function_body[1:]
 
                         if function in self.names : stack.append(self.names[function])
                         else : 
@@ -111,7 +148,7 @@ class parser :
                         if line.split()[1] in self.names : stack.append(self.names[line.split()[1]])
                         else : 
 
-                            stack.append(rast.NamedVariable(line.split()[1] , line.split()[0] , line.split()[2].split(';')))
+                            stack.append(rast.NamedVariable(line.split()[1] , line.split()[0] , line.split()[3].split(';')[0]))
                             self.names[line.split()[1]] = stack[-1]
                         
                         index += 1              
@@ -139,12 +176,12 @@ class parser :
                         line = body[index]
                         line = line.strip()
 
-                    if_body.append(line)
+                    if_body = if_body[1:]
                     stack.append(rast.If(condition , if_body))
                     index += 1
 
                 elif line.startswith('std') :
-                    
+
                     stack.append(rast.SRO(line.split(' ')[1] , self.remove_cols(line.split('<<')[1:])))
                     index += 1
 
@@ -169,7 +206,7 @@ class parser :
                         index += 1
                         line = body[index]
 
-                    for_body.append(line)
+                    for_body = for_body[1:]
                     stack.append(rast.ForLoop(initalization , condition , iteration , for_body))
                     index += 1
 
@@ -187,7 +224,7 @@ class parser :
                         index += 1
                         line = body[index]
 
-                    while_body.append(line)
+                    while_body = while_body[1:]
                     stack.append(rast.WhileLoop(condition , while_body))
                     index += 1
 
@@ -195,44 +232,38 @@ class parser :
 
                     if line : 
 
-                        line = line.split()
+                        if (line[0] == '"' and line[-1] == '"') or (line[0] == "'" and line[-1] == "'") :
 
-                        for value in line : 
+                            stack.append(rast.Variable('str' , line))
+                            index += 1
 
-                            value = value.split(';')[0]
+                        else : 
 
-                            if (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'") :
+                            line = line.split()
 
-                                stack.append(rast.BuiltInFunction('str' , value))
-                                index += 1
+                            for value in line :
 
-                            elif '.' in value : 
+                                value = value.split(';')[0]
 
-                                stack.append(rast.BuiltInFunction('float' , value))
-                                index += 1
-                            
-                            elif value.isdigit() :
+                                if '.' in value : stack.append(rast.Variable('float' , value))
+                                    index += 1
+                                
+                                elif value.isdigit() : stack.append(rast.Variable('int' , value))
+                                    index += 1
 
-                                stack.append(rast.BuiltInFunction('int' , value))
-                                index += 1
+                                elif value in self.names : stack.append(self.names[value.split()[0]])
+                                    index += 1
 
-                            elif value.split()[0] in self.names : 
+                                elif value in self.ops : stack.append(rast.Operator(value))
+                                    index += 1
 
-                                stack.append(self.names[value.split()[0]])
-                                index += 1
+                                else : 
 
-                            elif value in self.ops :
-
-                                stack.append(rast.Operator(value))
-                                index += 1
-
-                            else : 
-
-                                stack.append(value)
-                                index += 1
+                                    stack.append(value)
+                                    index += 1
 
                     else : index += 1
-        # print(stack)
+
         for index in range(len(stack)) : 
 
             value = stack[index]
@@ -260,10 +291,20 @@ class parser :
                 stack[index].condition = self.gen_ast_cpp(stack[index].condition.split())
             
             elif isinstance(value , rast.SRO) : stack[index].body = self.gen_ast_cpp(stack[index].body)
+            elif isinstance(value , rast.Return) : stack[index].value = self.gen_ast_cpp(stack[index].value.split())
 
         return stack
 
     def load_files(self) : 
+        '''
+        This function is used to load the files into the raster object.
+
+        Args :
+            None
+        
+        Returns :
+            The AST for the C program.
+        '''
 
         if self.load_type == 'cpp' : 
             
