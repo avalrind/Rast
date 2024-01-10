@@ -49,11 +49,20 @@ class rast :
             self.name = name
             self.body = body
 
-    class IfDef : 
+    class If : 
         
         def __init__(self , condition , body) : 
 
             self.condition = condition
+            self.body = body
+
+    class ForLoop : 
+
+        def __init__(self , initalization , condition , iteration , body) : 
+
+            self.initalization = initalization
+            self.condition = condition
+            self.iteration = iteration
             self.body = body
 
     class Operator: 
@@ -61,3 +70,10 @@ class rast :
         def __init__(self , value) : 
 
             self.value = value
+
+    class WhileLoop : 
+
+        def __init__(self , condition , body) : 
+
+            self.condition = condition
+            self.body = body
